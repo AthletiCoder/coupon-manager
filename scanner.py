@@ -1,3 +1,6 @@
+'''
+Server which mails new entries every second
+'''
 from __future__ import print_function
 
 import os.path
@@ -5,6 +8,8 @@ from asyncore import read
 import cv2
 import pandas as pd
 import time
+
+from config import SENDER_EMAIL, SENDER_PASSWORD, FEEDBACKS_SHEET_ID
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -15,8 +20,8 @@ from googleapiclient.errors import HttpError
 import smtplib, ssl
 
 smtp_server = "smtp.gmail.com"
-sender_email = "ashrayfoundation.edu@gmail.com"
-password = "haphvuxwvhdxzzke"
+sender_email = SENDER_EMAIL
+password = SENDER_PASSWORD
 
 
 # If modifying these scopes, delete the file token.json.
@@ -24,7 +29,7 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 LAST_ROW = 2
 
 # The ID and range of a sample spreadsheet.
-FEEDBACKS_SPREADSHEET_ID = '1DaH9vXd1J_8WvkuHHR01Uix_16fIFSdohekGT3T9FdU'
+SPREADSHEET_ID = FEEDBACKS_SHEET_ID
 SAMPLE_RANGE_NAME = 'Sheet1!A{row}:D'
 
 def fetch_feedback_data():
@@ -52,7 +57,7 @@ def fetch_feedback_data():
 
         # Call the Sheets API
         sheet = service.spreadsheets()
-        result = sheet.values().get(spreadsheetId=FEEDBACKS_SPREADSHEET_ID,
+        result = sheet.values().get(spreadsheetId=SPREADSHEET_ID,
                                     range=SAMPLE_RANGE_NAME.format(row=LAST_ROW)).execute()
         values = result.get('values', [])
 
@@ -78,12 +83,16 @@ def send_email(receiver_email):
         print(receiver_email)
         server.sendmail(sender_email, receiver_email, message)
 
+def init_server():
+    global LAST_ROW
+    while True:
+        print(LAST_ROW)
+        new_feedbacks = fetch_feedback_data()
+        if new_feedbacks:
+            for new_feedback in new_feedbacks:
+                participant_email = new_feedback[2]
+                send_email(participant_email)
+        time.sleep(1)
 
-while True:
-    print(LAST_ROW)
-    new_feedbacks = fetch_feedback_data()
-    if new_feedbacks:
-        for new_feedback in new_feedbacks:
-            participant_email = new_feedback[2]
-            send_email(participant_email)
-    time.sleep(1)
+if __name__=='__main__':
+    init_server()
